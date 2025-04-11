@@ -5,7 +5,6 @@ from utils import extract_features_from_transactions, explain_reason, suggest_im
 
 
 app = Flask(__name__)
-
 model = joblib.load('model/credit_score_model.pkl')
 scaler = joblib.load('model/scaler.pkl')
 
