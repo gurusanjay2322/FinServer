@@ -1,5 +1,10 @@
 import pandas as pd
 import numpy as np
+import os
+import google.generativeai as genai
+
+# Load Gemini API key from environment variable
+genai.configure(api_key="AIzaSyDnocuEMTbVguWoxBwBGICbjk7hxrx7T_c")
 
 def extract_features_from_transactions(user_tx_df):
     user_tx_df['Timestamp'] = pd.to_datetime(user_tx_df['Timestamp'])
@@ -38,41 +43,28 @@ def extract_features_from_transactions(user_tx_df):
         'Circular Tx': circular_tx,
         'Expense/Income Ratio': expense_income_ratio
     }])
+
+
 def suggest_improvements(row):
     suggestions = []
 
     if row['Failed Tx'] > 2:
-        suggestions.append(
-            "You have too many failed transactions. Ensure you have a stable internet connection and enough account balance while making payments."
-        )
+        suggestions.append("Too many failed transactions. Ensure stable internet and sufficient balance.")
     if row['Circular Tx'] > 2:
-        suggestions.append(
-            "Avoid sending money to yourself repeatedly. This behavior might appear suspicious and impact your financial credibility."
-        )
+        suggestions.append("Avoid repeated self-transfers. It looks suspicious.")
     if row['Expense/Income Ratio'] > 1.5:
-        suggestions.append(
-            "You're spending more than you're earning. Try to reduce unnecessary expenses and increase your savings."
-        )
+        suggestions.append("You're spending more than earning. Try to save more.")
     if row['Frequency'] < 0.2:
-        suggestions.append(
-            "Your transaction activity is quite irregular. Regular and consistent transactions improve your financial profile."
-        )
+        suggestions.append("Increase your transaction frequency for a healthier profile.")
     if row['Avg Sent'] > 2 * row['Avg Received']:
-        suggestions.append(
-            "You're sending a lot more money than you're receiving. Try to maintain a better balance between your inflow and outflow."
-        )
+        suggestions.append("You're sending a lot more than receiving. Try to balance it.")
     if row['Total Received'] < 1000:
-        suggestions.append(
-            "Your account receives a low amount of funds. Try to increase your income sources or maintain a healthier inflow."
-        )
+        suggestions.append("Try increasing your inflow by improving income sources.")
     if row['Total Sent'] > 10000 and row['Total Received'] < 5000:
-        suggestions.append(
-            "You're sending out a large amount with low incoming funds. This creates an imbalance in your financial behavior."
-        )
+        suggestions.append("You're sending too much with little inflow. Not ideal.")
     if row['Num Sent'] > 20 and (row['Failed Tx'] / row['Num Sent']) > 0.2:
-        suggestions.append(
-            "A significant portion of your transactions are failing. Check your app, bank, or network settings to ensure smoother transactions."
-        )
+        suggestions.append("High failure rate in sent transactions. Check your payment app.")
+
     if not suggestions:
         return {
             "message": "You're on the right track! Keep maintaining your healthy financial habits.",
@@ -96,6 +88,8 @@ def explain_reason(row):
     if row['Frequency'] < 0.2:
         reasons.append("Irregular transaction activity")
     return " | ".join(reasons) if reasons else "Healthy behavior"
+
+
 def clean_transaction_keys(transactions):
     cleaned = []
     for tx in transactions:
@@ -105,3 +99,21 @@ def clean_transaction_keys(transactions):
             new_tx[clean_key] = value
         cleaned.append(new_tx)
     return cleaned
+
+
+def get_deepseek_suggestions(explanation: str, improvements: dict) -> str:
+    prompt = f"""
+    A user has the following financial behavior:
+    - Explanation: {explanation}
+    - Suggestions: {', '.join(improvements['suggestions']) if improvements['suggestions'] else "None"}
+
+    Write a professional but friendly 5-6 sentence suggestion to help the user improve their credit score.
+    """
+
+    try:
+        model = genai.GenerativeModel(model_name="models/gemini-1.5-pro")
+        response = model.generate_content([prompt])  # Make sure it's wrapped in a list
+        return response.text.strip()
+    except Exception as e:
+        return f"Sorry, we couldn't fetch advice from Gemini: {str(e)}"
+

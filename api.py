@@ -2,8 +2,7 @@ from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
 from pymongo import MongoClient
-from utils import extract_features_from_transactions, explain_reason, suggest_improvements,clean_transaction_keys
-
+from utils import extract_features_from_transactions, explain_reason, suggest_improvements,clean_transaction_keys,get_deepseek_suggestions  
 
 app = Flask(__name__)
 
@@ -41,7 +40,7 @@ def predict_score():
         # Explanations
         explanation = explain_reason(features.iloc[0])
         improvements = suggest_improvements(features.iloc[0])
-
+        deepseek_advice = get_deepseek_suggestions(explanation, improvements)
         # Get last 5 transactions (sorted by time descending)
         tx_df['Timestamp'] = pd.to_datetime(tx_df['Timestamp'])
         last_5 = tx_df.sort_values(by='Timestamp', ascending=False).head(5)
@@ -66,11 +65,13 @@ def predict_score():
             credit_scores_collection.insert_one(credit_score_record)
 
         return jsonify({
-            'credit_score': round(predicted_score, 2),
-            'explanation': explanation,
-            'improvements': improvements,
-            'last_5_transactions': last_5_cleaned
-        })
+    'credit_score': round(predicted_score, 2),
+    'explanation': explanation,
+    'improvements': improvements,
+    'deepseek_advice': deepseek_advice,
+    'last_5_transactions': last_5_cleaned
+})
+
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
