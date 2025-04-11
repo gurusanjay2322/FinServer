@@ -96,3 +96,12 @@ def explain_reason(row):
     if row['Frequency'] < 0.2:
         reasons.append("Irregular transaction activity")
     return " | ".join(reasons) if reasons else "Healthy behavior"
+def clean_transaction_keys(transactions):
+    cleaned = []
+    for tx in transactions:
+        new_tx = {}
+        for key, value in tx.items():
+            clean_key = key.replace(" (INR)", "").replace(" ", "_")
+            new_tx[clean_key] = value
+        cleaned.append(new_tx)
+    return cleaned

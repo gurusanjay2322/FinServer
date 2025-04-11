@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
-from utils import extract_features_from_transactions, explain_reason, suggest_improvements
+from utils import extract_features_from_transactions, explain_reason, suggest_improvements,clean_transaction_keys
 
 
 app = Flask(__name__)
@@ -24,21 +24,26 @@ def predict_score():
 
     try:
         tx_df = pd.DataFrame(data['transactions'])
-        tx_df['Timestamp'] = pd.to_datetime(tx_df['Timestamp'])
-        tx_df = tx_df.sort_values(by='Timestamp', ascending=False)
-        last_five_tx = tx_df.head(5).to_dict(orient='records')
 
+        # Extract features
         features = extract_features_from_transactions(tx_df)
         X_user = scaler.transform(features[feature_cols])
         predicted_score = float(model.predict(X_user)[0])
+
+        # Explanations
         explanation = explain_reason(features.iloc[0])
         improvements = suggest_improvements(features.iloc[0])
+
+        # Get last 5 transactions (sorted by time descending)
+        tx_df['Timestamp'] = pd.to_datetime(tx_df['Timestamp'])
+        last_5 = tx_df.sort_values(by='Timestamp', ascending=False).head(5)
+        last_5_cleaned = clean_transaction_keys(last_5.to_dict(orient='records'))
 
         return jsonify({
             'credit_score': round(predicted_score, 2),
             'explanation': explanation,
             'improvements': improvements,
-            'last_5_transactions': last_five_tx
+            'last_5_transactions': last_5_cleaned
         })
 
     except Exception as e:
